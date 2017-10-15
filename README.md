@@ -2,16 +2,22 @@
 # Comrelay #
 
 Command line based web hook HTTP server that allows requests to be routed to
-server side commands.
+server side commands via secret key form encoded request authentication.
 
-## Install ##
+## Setup ##
 
 To install this module, run the following commands:
 
-	perl Makefile.PL
-	make
-	make test
-	make install
+	$ perl Makefile.PL
+	$ make
+	# make install
+
+Once you have installed Comrelay you can use the main command.
+
+    $ comrelay [help] [list] [add] [remove] [server]
+
+For additional information for the given commands please read the help that can
+be viewed with the help command.
 
 ## License ##
 

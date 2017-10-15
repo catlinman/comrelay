@@ -7,11 +7,12 @@ use ExtUtils::MakeMaker;
 WriteMakefile(
     NAME             => 'Comrelay',
     AUTHOR           => q{Catlinman <contact@catlinman.com>},
-    VERSION_FROM     => 'lib/Comrelay.pm',
-    ABSTRACT_FROM    => 'lib/Comrelay.pm',
+    VERSION_FROM     => 'bin/comrelay',
+    ABSTRACT_FROM    => 'bin/comrelay',
     LICENSE          => 'mit',
     PL_FILES         => {},
     MIN_PERL_VERSION => '5.006',
+    EXE_FILES        => [('bin/comrelay')],
     CONFIGURE_REQUIRES => {
         'ExtUtils::MakeMaker' => '0',
     },

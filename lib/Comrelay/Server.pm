@@ -10,9 +10,25 @@ use warnings;
 use HTTP::Server::Brick;
 use HTTP::Status;
 
+BEGIN {
+    require Exporter;
+
+    # Set the version for version checking.
+    our $VERSION = 1.00;
+
+    # Inherit from Exporter to export functions and variables.
+    our @ISA = qw(Exporter);
+
+    # Functions and variables which are exported by default.
+    our @EXPORT = qw(start_server refresh_server stop_server);
+
+    # Functions and variables which can be optionally exported.
+    our @EXPORT_OK = qw();
+}
+
 my $server;
 
-sub start {
+sub start_server {
     my ($port, $fork) = @_;
 
     $port ||= 9669;
@@ -23,7 +39,7 @@ sub start {
         fork => $fork
     );
 
-    # Start mounting inputs
+    # Start mounting inputs.
     $server->mount('/' => {
         handler => sub {
             my ($req, $res) = @_;
@@ -38,11 +54,11 @@ sub start {
     $server->start;
 }
 
-sub refresh {
+sub refresh_server {
 
 }
 
-sub stop {
+sub stop_server {
     $server->stop;
 }
 
