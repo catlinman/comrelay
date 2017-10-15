@@ -2,12 +2,16 @@
 use 5.006;
 use strict;
 use warnings;
+use File::Copy;
 use ExtUtils::MakeMaker;
+
+# Copy the executable script and rename it for command line use.
+copy('bin/Comrelay.pm', 'bin/comrelay') or die "Failed to copy executable script: $!";
 
 WriteMakefile(
     NAME             => 'Comrelay',
-    AUTHOR           => q{Catlinman <contact@catlinman.com>},
-    VERSION_FROM     => 'bin/comrelay',
+    AUTHOR           => 'Catlinman <contact@catlinman.com>',
+    VERSION          => '0.1',
     ABSTRACT_FROM    => 'bin/comrelay',
     LICENSE          => 'mit',
     PL_FILES         => {},
@@ -21,6 +25,7 @@ WriteMakefile(
     },
     PREREQ_PM => {
         'HTTP::Server::Brick' => '0.1.7',
+        'Data::UUID' => '1.221',
     },
     dist  => { COMPRESS => 'gzip -9f', SUFFIX => 'gz', },
     clean => { FILES => 'comrelay-*' },

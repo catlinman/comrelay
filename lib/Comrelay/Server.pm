@@ -10,6 +10,9 @@ use warnings;
 use HTTP::Server::Brick;
 use HTTP::Status;
 
+# Load submodules.
+use Comrelay::Routes;
+
 BEGIN {
     require Exporter;
 
