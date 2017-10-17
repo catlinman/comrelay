@@ -20,7 +20,7 @@ use Getopt::Long;
 use Pod::Usage;
 
 # Implement a quick say command.
-sub say { print @_, "\n" }
+sub say {print @_, "\n"}
 
 sub main {
     # Get the primary command and pop it off of @ARGV.
@@ -32,17 +32,19 @@ sub main {
     if($command eq 'server') {
         # Set defaults.
         my $port = 9669;
-        my $fork = 0;
+        my $ssl = 0;
 
         # Get command line options.
         GetOptions (
             'port|p=i' => \$port,
+            'ssl' => \$ssl,
         );
 
-        say "Starting the server on port $port.";
+        say "Starting a Comrelay HTTP server on port $port." if not $ssl;
+        say "Starting a Comrelay HTTP server with SSL on port $port." if $ssl;
 
         # Start the server.
-        Comrelay::Server::start($port, $fork);
+        Comrelay::Server::start($port, $ssl);
 
     } elsif($command eq 'add') {
         # Set defaults.

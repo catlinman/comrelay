@@ -1,8 +1,11 @@
 
 # Comrelay #
 
-Command line based web hook HTTP server that allows requests to be routed to
+Command line based HTTP server that allows requests to be routed to
 server side commands via secret key form encoded request authentication.
+
+Notice: Currently secret key passing is not enabled. The key is part of the URL
+for debugging reasons at this point.
 
 ## Setup ##
 

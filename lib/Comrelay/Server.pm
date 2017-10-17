@@ -6,12 +6,12 @@ package Comrelay::Server;
 use strict;
 use warnings;
 
-# Server and routing library.
-use HTTP::Server::Brick;
-use HTTP::Status;
-
 # Load submodules.
 use Comrelay::Routes;
+
+# Server and routing library.
+use HTTP::Server::Brick;
+use HTTP::Daemon::SSL;
 
 # Main server instance reference.
 my $server;
@@ -69,9 +69,10 @@ sub _update {
 
 sub start {
     # Get and handle arguments.
-    my ($port) = @_;
+    my ($port, $ssl) = @_;
 
     $port ||= 9669;
+    $ssl ||= 0;
 
     # Write a temporary file with the port for other Comrelay processes to use.
     open(my $handle, '>', '.comrelay_port');
@@ -81,15 +82,18 @@ sub start {
     # Handle keyboard interrupts and clear memory.
     $SIG{INT} = sub {
         # Delete the temporary port designation file.
-        unlink('.comrelay_port');
+        unlink '.comrelay_port';
 
         exit;
     };
 
     # Create a new server instance.
+    $server = HTTP::Server::Brick->new(port => $port) if not $ssl;
+
     $server = HTTP::Server::Brick->new(
+        daemon_class => 'HTTP::Daemon::SSL',
         port => $port
-    );
+    ) if $ssl;
 
     # Start mounting inputs.
     $server->mount('/' => {
