@@ -6,17 +6,21 @@ package Comrelay::Routes;
 use strict;
 use warnings;
 
-# Additional modules.
-use Data::UUID;
+# HTTP request handling for updating the server via GET request.
+use LWP::Simple;
 
 # Name of the configuration file and specify the delimiter.
-my $filename = 'data.csv';
+my $filename = '.comrelay_routes';
 my $filedelimiter = ',';
 my @fileformat = ('route', $filedelimiter,  'secret', $filedelimiter, 'command');
 my $fileheader = join("", @fileformat);
 
+# Secret random generation characters.
+my @secretchars = ("A".."Z", "a".."z");
+my $secretlength = 32;
+
 # Hash storage of routes and their commands.
-my %data;
+my %routes;
 
 BEGIN {
     require Exporter;
@@ -28,15 +32,15 @@ BEGIN {
     our @ISA = qw(Exporter);
 
     # Functions and variables which are exported by default.
-    our @EXPORT = qw(get add remove);
+    our @EXPORT = qw(load save add remove);
 
     # Functions and variables which can be optionally exported.
     our @EXPORT_OK = qw();
 }
 
-sub setup {
+sub _setup {
     # Create the data.csv file for writing.
-    open(my $filehandle, '>', $filename) or die "Could not open '$filename' $!.\n";
+    open my $filehandle, '>', $filename or die "Routes: Could not open '$filename' $!.\n";
 
     # Write the headers.
     print $filehandle $fileheader;
@@ -50,118 +54,151 @@ sub load {
     my $exists = (-e $filename ? 1 : 0);
 
     # Check if the file exists. If not run first time setup.
-    if(!$exists) {
-        # Create the default file.
-        setup;
+    _setup if(not $exists);
 
-    } else {
-        # Open the file in read mode.
-        open(my $filehandle, '<', $filename) or die "Could not open '$filename' $!.\n";
+    # Clear the hash for a possible reload to avoid duplicate detection.
+    %routes = ();
 
-        # Iterate over lines in the file handle.
-        my $linecount = 0;
-        while(my $line = <$filehandle>) {
-            # Increment line count.
-            $linecount++;
+    # Open the file in read mode.
+    open ROUTESFILE, '<', $filename or die "Routes: Could not open '$filename' $!.\n";
 
-            # Remove any possible line breaks.
-            $line =~ s/[\r\n]+$//;
+    # Iterate over lines in the file handle.
+    my $linecount = 0;
+    while(my $line = <ROUTESFILE>) {
+        # Increment line count.
+        $linecount++;
 
-            # Skip the line if it's the header.
-            next if($line eq $fileheader);
+        # Remove any possible line breaks.
+        $line =~ s/[\r\n]+$//;
 
-            # Split the CSV file with the correct delimiter.
-            my ($route, $command, $secret) = split /$filedelimiter/, $line;
+        # Skip the line if it's the header.
+        next if($line eq $fileheader);
 
-            # Check file formatting integrity.
-            if (!$route or !$command or !$secret) {
-                print "Routes: Incorrect length of values at line $linecount of '$filename'. \n";
+        # Split the CSV file with the correct delimiter.
+        my ($route, $command, $secret) = split /$filedelimiter/, $line;
 
-                next;
-            }
+        # Check file formatting integrity.
+        if(not $route or not $command or not $secret) {
+            print "Routes: Incorrect length of values at line $linecount of '$filename'. \n";
 
-            if($data{$route}) {
-                print "Routes: Duplicate route '$route' at line $linecount of '$filename'.\n";
-
-                next;
-            }
-
-            # Assign an array to the route hash.
-            $data{$route} = [$command, $secret];
+            next;
         }
 
-        close $filehandle;
+        if($routes{$route}) {
+            print "Routes: Duplicate route '$route' at line $linecount of '$filename'.\n";
+
+            next;
+        }
+
+        # Assign an array to the route hash.
+        $routes{$route} = [$command, $secret];
     }
 
-    %data;
+    # Close the file handle we have previously created.
+    close ROUTESFILE;
+
+    %routes;
 }
 
 sub save {
-    # TODO: This is very broken I will fix this tomorrow.
     # Open up the data file.
-    open(my $filehandle, '>', $filename) or die "Could not open '$filename' $!.\n";
+    open my $filehandle, '>', $filename or die "Routes: Could not open '$filename' $!.\n";
 
     # Write the headers.
     print $filehandle "$fileheader\n";
-    print $filehandle "TEST\n";
 
-    foreach my $route (keys %data) {
-        my $secret = $data{$route}[0];
-        my $command = $data{$route}[1];
+    foreach my $route (keys %routes) {
+        my $secret = $routes{$route}[0];
+        my $command = $routes{$route}[1];
 
+        # Create an array for easier string formatting without concatenation.
         my @formatted = ($route, $filedelimiter,  $secret, $filedelimiter, $command, "\n");
-        print $secret;
-        print $filehandle join("", @fileformat);
+
+        print $filehandle join("", @formatted);
     }
 
     # Close handle.
     close $filehandle;
 
-    %data;
-}
+    # Check if the port file exists.
+    my $exists = (-e '.comrelay_port' ? 1 : 0);
 
-sub get {
-    # Return the reference if it exists or read the file.
-    %data or load;
+    if($exists) {
+        # Port of the possibly currently running server.
+        my $port = 0;
+
+        # Read the found port file.
+        local $/ = undef;
+        open PORTFILE, '.comrelay_port' or die "Routes: Could not open 'port' $!.\n";
+        $port = <PORTFILE>;
+        close PORTFILE;
+
+        # Make a reload request if the server is currently running.
+        if($port) {
+            print "Routes: Making an update request to the server on port $port.\n";
+
+            my $content = LWP::Simple::get("http://localhost:$port/admin/update/");
+
+            print "Routes: (Response) $content\n";
+        }
+    }
+
+    %routes;
 }
 
 sub add {
-    # Get arguments.
+    # Get and handle arguments.
     my ($route, $secret, $command) = @_;
 
-    die 'Missing required arguments.' if(!$route or !$command);
+    die 'Missing required arguments' if not $route or not $command;
 
     # Get data if it isn't present.
-    get if(!%data);
+    load if(not %routes);
+
+    # Make sure that there isn't already a route defined with this name.
+    die "Routes: The route '$route' already exists.\n" if $routes{$route};
 
     # Generate a unique ID if no secret is specified.
-    $secret ||= "asdf";
+    if(not $secret) {
+        $secret .= $secretchars[rand @secretchars] for 1..$secretlength;
+    }
 
     # Assign an array to the route hash.
-    $data{$route} = [$command, $secret];
+    $routes{$route} = [$secret, $command];
 
-    # Save the changes.
+    print "Routes: Successfully added '$route'.\n";
+
+    # Save the changes and return the new data.
     save;
 }
 
 sub remove {
-    # Get arguments.
+    # Get and handle arguments.
     my ($route) = @_;
 
-    die 'Missing required arguments.' if(!$route);
+    die 'Missing required arguments' if not $route;
 
     # Load data if it isn't present.
-    get if(!%data);
+    load if(!%routes);
 
-    if($data{$route}) {
-        delete $data{$route};
+    if($routes{$route}) {
+        my $removedata = $routes{$route};
 
-        save;
+        # Delete the entry from the routes hash.
+        delete $routes{$route};
 
         print "Routes: Successfully removed '$route'.\n";
 
+        # Save changes.
+        save;
+
+        # Return the removed data.
+        $removedata;
+
     } else {
         print "Routes: The route '$route' does not exist.\n";
+
+        0;
     }
 }
 

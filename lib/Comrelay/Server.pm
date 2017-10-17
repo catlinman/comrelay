@@ -6,12 +6,15 @@ package Comrelay::Server;
 use strict;
 use warnings;
 
-# Server library.
+# Server and routing library.
 use HTTP::Server::Brick;
 use HTTP::Status;
 
 # Load submodules.
 use Comrelay::Routes;
+
+# Main server instance reference.
+my $server;
 
 BEGIN {
     require Exporter;
@@ -23,23 +26,69 @@ BEGIN {
     our @ISA = qw(Exporter);
 
     # Functions and variables which are exported by default.
-    our @EXPORT = qw(start_server refresh_server stop_server);
+    our @EXPORT = qw(start);
 
     # Functions and variables which can be optionally exported.
     our @EXPORT_OK = qw();
 }
 
-my $server;
+sub _log {
+    my ($text) = @_;
 
-sub start_server {
-    my ($port, $fork) = @_;
+    my $localtime = localtime;
+    print("[$localtime] [$$] $text\n");
+}
+
+sub _update {
+    # Load route information.
+    my %routes = Comrelay::Routes::load;
+
+    foreach my $route (keys %routes) {
+        # Get the data array information.
+        my $secret = $routes{$route}[0];
+        my $command = $routes{$route}[1];
+
+        # Mount the new route.
+        $server->mount("/routes/$route/$secret" => {
+            handler => sub {
+                my ($req, $res) = @_;
+
+                _log "Running '$command'.";
+                my $output = `$command`;
+
+                # Return the output.
+                $res->header('Content-type', 'text/plain');
+                $res->add_content("Server has run the command '$command' as $ENV{USERNAME}.\n$output");
+
+                1;
+            },
+            wildcard => 0,
+        });
+    }
+}
+
+sub start {
+    # Get and handle arguments.
+    my ($port) = @_;
 
     $port ||= 9669;
-    $fork ||= 0;
 
+    # Write a temporary file with the port for other Comrelay processes to use.
+    open(my $handle, '>', '.comrelay_port');
+    print $handle "$port";
+    close $handle;
+
+    # Handle keyboard interrupts and clear memory.
+    $SIG{INT} = sub {
+        # Delete the temporary port designation file.
+        unlink('.comrelay_port');
+
+        exit;
+    };
+
+    # Create a new server instance.
     $server = HTTP::Server::Brick->new(
-        port => $port,
-        fork => $fork
+        port => $port
     );
 
     # Start mounting inputs.
@@ -47,22 +96,34 @@ sub start_server {
         handler => sub {
             my ($req, $res) = @_;
 
-            $res->add_content('Success.');
+            $res->header('Content-type', 'text/plain');
+            $res->code(200);
+
+            1;
+        },
+        wildcard => 1,
+    });
+
+    # Start mounting inputs.
+    $server->mount('/admin/update' => {
+        handler => sub {
+            my ($req, $res) = @_;
+
+            # Reload the routes file and mount new routes.
+            _update;
+
+            $res->header('Content-type', 'text/plain');
+            $res->add_content("Successfully updated routes.");
 
             1;
         },
         wildcard => 0,
     });
 
+    # Load routes file and mount routes.
+    _update;
+
     $server->start;
-}
-
-sub refresh_server {
-
-}
-
-sub stop_server {
-    $server->stop;
 }
 
 1;

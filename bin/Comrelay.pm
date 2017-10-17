@@ -37,7 +37,6 @@ sub main {
         # Get command line options.
         GetOptions (
             'port|p=i' => \$port,
-            'fork|f=i' => \$fork,
         );
 
         say "Starting the server on port $port.";
@@ -58,9 +57,9 @@ sub main {
             'command|c=s' => \$command,
         );
 
-        die "Required arguments not specified. Use 'help' for reference." if(!$route or !$command);
+        die "Required arguments not specified. Use 'help' for reference.\n" if not $route or not $command;
 
-        # Add the new route with a command and an optional secret.
+        # Set the new route with a command and an optional secret.
         Comrelay::Routes::add($route, $secret, $command);
 
     } elsif($command eq 'remove') {
@@ -72,24 +71,29 @@ sub main {
             'route|r=s' => \$route,
         );
 
-        die "Required arguments not specified. Use 'help' for reference." if(!$route);
+        die "Required arguments not specified. Use 'help' for reference.\n" if not $route;
 
         # Remove the route.
         Comrelay::Routes::remove($route);
 
     } elsif($command eq 'list') {
-        my %data = Comrelay::Routes->get;
+        my %routes = Comrelay::Routes->load;
 
-        say "There are no defined routes." if(keys %data == 0);
+        say "There are no defined routes." if(keys %routes == 0);
 
-        foreach my $route (keys %data) {
-            my $secret = $data{$route}[0];
-            my $command = $data{$route}[1];
+        my $index = 1;
+        foreach my $route (keys %routes) {
+            # Get the data array information.
+            my $secret = $routes{$route}[0];
+            my $command = $routes{$route}[1];
 
-            say "$route (Secret: $secret) \-\> $command";
+            # Print a nicely formatted string for each entry.
+            say "$index. $route (Secret: $secret) \-\> $command";
+
+            $index++; # Increment the index.
         }
 
-    } elsif(!$command or $command eq 'help') {
+    } elsif(not $command or $command eq 'help') {
         pod2usage(0);
 
     } else {
@@ -166,7 +170,3 @@ Starts the main HTTP server.
 =head4 --port|p
 
 Specifies the port to run the HTTP server on. Defaults to "9669".
-
-=head4 --fork|f
-
-Whether the server should fork from the main process. Defaults to "0".

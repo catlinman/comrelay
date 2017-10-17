@@ -25,7 +25,7 @@ WriteMakefile(
     },
     PREREQ_PM => {
         'HTTP::Server::Brick' => '0.1.7',
-        'Data::UUID' => '1.221',
+        'LWP::Simple' => '6.27',
     },
     dist  => { COMPRESS => 'gzip -9f', SUFFIX => 'gz', },
     clean => { FILES => 'comrelay-*' },
