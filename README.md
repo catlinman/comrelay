@@ -22,6 +22,10 @@ Once you have installed Comrelay you can use the main command.
 For additional information for the given commands please read the help that can
 be viewed with the help command.
 
+Comrelay creates its configuration files in the current execution directory.
+This means that running any Comrelay commands that modify the configuration
+must be executed in the directory where the configuration is stored.
+
 ## Security ##
 
 It is advised to bind the server to better handle access to paths such as the

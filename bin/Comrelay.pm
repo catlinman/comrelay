@@ -47,6 +47,7 @@ sub main {
         if($ssl_key and $ssl_cert) {
             say "Using $ssl_key and $ssl_cert for SSL.";
             say "Starting a Comrelay HTTP server with SSL on port $port.";
+            
         } else {
             say "Starting a Comrelay HTTP server on port $port.";
         }

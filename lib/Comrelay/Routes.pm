@@ -114,7 +114,7 @@ sub save {
     open my $routesfile, '>', $routesfile or die "Routes: Could not open '$routesfile' $!.\n";
 
     # Write the headers.
-    print <$routesfile>, "$header\n";
+    print $routesfile "$header\n";
 
     foreach my $route (keys %routes) {
         my $secret = $routes{$route}[0];
