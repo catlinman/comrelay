@@ -13,6 +13,9 @@ use Comrelay::Routes;
 use HTTP::Server::Brick;
 use HTTP::Daemon::SSL;
 
+# Name of the routes and port file.
+my $portfile = '.comrelay_port';
+
 # Main server instance reference.
 my $server;
 
@@ -69,32 +72,48 @@ sub _update {
 
 sub start {
     # Get and handle arguments.
-    my ($port, $ssl) = @_;
+    my ($port, $bind, $ssl_key, $ssl_cert) = @_;
 
-    $port ||= 9669;
-    $ssl ||= 0;
+    $port ||= 9669; # Local port to run the server on.
+    $bind ||= ''; # Bind host address. Binds to the hostname by default.
+
+    # Specifying both of these enables SSL.
+    $ssl_key ||= 0; # SSL key file path.
+    $ssl_cert ||= 0; # SSL certificate file path.
 
     # Write a temporary file with the port for other Comrelay processes to use.
-    open(my $handle, '>', '.comrelay_port');
-    print $handle "$port";
-    close $handle;
+    open my $portfile, '>', $portfile or die "Server: Could not open '$portfile' $!.\n";;
+    print $portfile "$port";
+    close $portfile;
 
     # Handle keyboard interrupts and clear memory.
     $SIG{INT} = sub {
         # Delete the temporary port designation file.
-        unlink '.comrelay_port';
+        unlink $portfile;
 
         exit;
     };
 
     # Create a new server instance.
-    $server = HTTP::Server::Brick->new(port => $port) if not $ssl;
+    if($ssl_key and $ssl_cert) {
+        $server = HTTP::Server::Brick->new(
+            daemon_class => 'HTTP::Daemon::SSL',
+            daemon_args => [
+                LocalAddr => $bind,
+                SSL_key_file  => $ssl_key,
+                SSL_cert_file => $ssl_cert,
+            ],
+            port => $port
+        );
 
-    $server = HTTP::Server::Brick->new(
-        daemon_class => 'HTTP::Daemon::SSL',
-        port => $port
-    ) if $ssl;
-
+    } else {
+        $server = HTTP::Server::Brick->new(
+            daemon_args => [
+                LocalAddr => $bind,
+            ],
+            port => $port
+        );
+    }
     # Start mounting inputs.
     $server->mount('/' => {
         handler => sub {

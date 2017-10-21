@@ -9,11 +9,20 @@ use warnings;
 # HTTP request handling for updating the server via GET request.
 use LWP::Simple;
 
-# Name of the configuration file and specify the delimiter.
-my $filename = '.comrelay_routes';
-my $filedelimiter = ',';
-my @fileformat = ('route', $filedelimiter,  'secret', $filedelimiter, 'command');
-my $fileheader = join("", @fileformat);
+# Name of the routes and port file.
+my $routesfile = '.comrelay_routes';
+my $portfile = '.comrelay_port';
+
+# Delimiter for reading of the configuration.
+my $delimiter = ',';
+
+my @format = (
+    'route', $delimiter,
+    'secret', $delimiter,
+    'command'
+);
+
+my $header = join("", @format);
 
 # Secret random generation characters.
 my @secretchars = ("A".."Z", "a".."z");
@@ -40,18 +49,18 @@ BEGIN {
 
 sub _setup {
     # Create the data.csv file for writing.
-    open my $filehandle, '>', $filename or die "Routes: Could not open '$filename' $!.\n";
+    open my $routesfile, '>', $routesfile or die "Routes: Could not open '$routesfile' $!.\n";
 
     # Write the headers.
-    print $filehandle $fileheader;
+    print $routesfile $header;
 
     # Close handle.
-    close $filehandle;
+    close $routesfile;
 }
 
 sub load {
     # Check if the file exists.
-    my $exists = (-e $filename ? 1 : 0);
+    my $exists = (-e $routesfile ? 1 : 0);
 
     # Check if the file exists. If not run first time setup.
     _setup if(not $exists);
@@ -60,11 +69,11 @@ sub load {
     %routes = ();
 
     # Open the file in read mode.
-    open ROUTESFILE, '<', $filename or die "Routes: Could not open '$filename' $!.\n";
+    open my $routesfile, '<', $routesfile or die "Routes: Could not open '$routesfile' $!.\n";
 
     # Iterate over lines in the file handle.
     my $linecount = 0;
-    while(my $line = <ROUTESFILE>) {
+    while(my $line = <$routesfile>) {
         # Increment line count.
         $linecount++;
 
@@ -72,20 +81,20 @@ sub load {
         $line =~ s/[\r\n]+$//;
 
         # Skip the line if it's the header.
-        next if($line eq $fileheader);
+        next if($line eq $header);
 
         # Split the CSV file with the correct delimiter.
-        my ($route, $command, $secret) = split /$filedelimiter/, $line;
+        my ($route, $command, $secret) = split /$delimiter/, $line;
 
         # Check file formatting integrity.
         if(not $route or not $command or not $secret) {
-            print "Routes: Incorrect length of values at line $linecount of '$filename'. \n";
+            print "Routes: Incorrect length of values at line $linecount of '$routesfile'. \n";
 
             next;
         }
 
         if($routes{$route}) {
-            print "Routes: Duplicate route '$route' at line $linecount of '$filename'.\n";
+            print "Routes: Duplicate route '$route' at line $linecount of '$routesfile'.\n";
 
             next;
         }
@@ -95,33 +104,33 @@ sub load {
     }
 
     # Close the file handle we have previously created.
-    close ROUTESFILE;
+    close $routesfile;
 
     %routes;
 }
 
 sub save {
     # Open up the data file.
-    open my $filehandle, '>', $filename or die "Routes: Could not open '$filename' $!.\n";
+    open my $routesfile, '>', $routesfile or die "Routes: Could not open '$routesfile' $!.\n";
 
     # Write the headers.
-    print $filehandle "$fileheader\n";
+    print <$routesfile>, "$header\n";
 
     foreach my $route (keys %routes) {
         my $secret = $routes{$route}[0];
         my $command = $routes{$route}[1];
 
         # Create an array for easier string formatting without concatenation.
-        my @formatted = ($route, $filedelimiter,  $secret, $filedelimiter, $command, "\n");
+        my @formatted = ($route, $delimiter,  $secret, $delimiter, $command, "\n");
 
-        print $filehandle join("", @formatted);
+        print $routesfile join("", @formatted);
     }
 
     # Close handle.
-    close $filehandle;
+    close $routesfile;
 
     # Check if the port file exists.
-    my $exists = (-e '.comrelay_port' ? 1 : 0);
+    my $exists = (-e $portfile ? 1 : 0);
 
     if($exists) {
         # Port of the possibly currently running server.
@@ -129,9 +138,9 @@ sub save {
 
         # Read the found port file.
         local $/ = undef;
-        open PORTFILE, '.comrelay_port' or die "Routes: Could not open 'port' $!.\n";
-        $port = <PORTFILE>;
-        close PORTFILE;
+        open my $portfile, '<', $portfile or die "Routes: Could not open 'port' $!.\n";
+        $port = <$portfile>;
+        close $portfile;
 
         # Make a reload request if the server is currently running.
         if($port) {

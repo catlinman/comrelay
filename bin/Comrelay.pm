@@ -32,19 +32,27 @@ sub main {
     if($command eq 'server') {
         # Set defaults.
         my $port = 9669;
-        my $ssl = 0;
+        my $bind = '';
+        my $ssl_key = 0;
+        my $ssl_cert = 0;
 
         # Get command line options.
         GetOptions (
             'port|p=i' => \$port,
-            'ssl' => \$ssl,
+            'bind|b=s' => \$bind,
+            'key|k=s' => \$ssl_key,
+            'cert|c=s' => \$ssl_cert,
         );
 
-        say "Starting a Comrelay HTTP server on port $port." if not $ssl;
-        say "Starting a Comrelay HTTP server with SSL on port $port." if $ssl;
+        if($ssl_key and $ssl_cert) {
+            say "Using $ssl_key and $ssl_cert for SSL.";
+            say "Starting a Comrelay HTTP server with SSL on port $port.";
+        } else {
+            say "Starting a Comrelay HTTP server on port $port.";
+        }
 
         # Start the server.
-        Comrelay::Server::start($port, $ssl);
+        Comrelay::Server::start($port, $bind, $ssl_key, $ssl_cert);
 
     } elsif($command eq 'add') {
         # Set defaults.
@@ -123,7 +131,7 @@ comrelay add --route|r --command|c
 
 comrelay remove --route|r
 
-comrelay server [--port|p] [--fork|f]
+comrelay server [--port|p] [--bind|b] [--key|k --cert|c]
 
 =head1 OPTIONS
 
@@ -165,10 +173,23 @@ Specifies the route to be removed.
 
 =head2 server
 
-Starts the main HTTP server.
+Starts the main HTTP server. For SSL support both a key and a
+certificate must be specified.
 
 =head3 ARGUMENTS
 
 =head4 --port|p
 
-Specifies the port to run the HTTP server on. Defaults to "9669".
+The port to run the HTTP server on. Defaults to "9669".
+
+=head4 --bind|b
+
+Address the server should bind to. Defaults to the hostname.
+
+=head4 --key|k
+
+Path of the SSL key to enable SSL.
+
+=head4 --cert|c
+
+Path of the SSL certificate to enable SSL.
