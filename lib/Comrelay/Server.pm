@@ -14,7 +14,7 @@ use HTTP::Server::Brick;
 use HTTP::Daemon::SSL;
 
 # Name of the routes and port file.
-my $portfile = '.comrelay_port';
+my $portfilename = '.comrelay_port';
 
 # Main server instance reference.
 my $server;
@@ -82,14 +82,14 @@ sub start {
     $ssl_cert ||= 0; # SSL certificate file path.
 
     # Write a temporary file with the port for other Comrelay processes to use.
-    open my $portfile, '>', $portfile or die "Server: Could not open '$portfile' $!.\n";;
-    print $portfile "$port";
-    close $portfile;
+    open my $portfilehandle, '>', $portfilename or die "Server: Could not open '$portfilename' $!.\n";;
+    print $portfilehandle "$port";
+    close $portfilehandle;
 
     # Handle keyboard interrupts and clear memory.
     $SIG{INT} = sub {
         # Delete the temporary port designation file.
-        unlink $portfile;
+        unlink $portfilehandle or die "Could not delete the file!\n";
 
         exit;
     };
