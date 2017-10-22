@@ -1,11 +1,8 @@
 
 # Comrelay #
 
-Command line based HTTP server that allows requests to be routed to
+Command line based HTTP/HTTPS server that allows requests to be routed to
 server side commands via secret key form encoded request authentication.
-
-Notice: Currently secret key passing is not enabled. The key is part of the URL
-for debugging reasons at this point.
 
 ## Setup ##
 
@@ -17,13 +14,13 @@ To install this module, run the following commands:
 
 Once you have installed Comrelay you can use the main command.
 
-    $ comrelay [help] [list] [add] [remove] [server]
+    $ comrelay [help] [list] [add] [remove] [start]
 
 If all else fails you can run Comrelay directly from its *bin* directory.
 This however makes managing of configuration files harder as they will be
 created in the project directory.
 
-    $ perl bin/Comrelay.pm [help] [list] [add] [remove] [server]
+    $ perl bin/Comrelay.pm [help] [list] [add] [remove] [start]
 
 For additional information for the given commands please read the help that can
 be viewed with the help command.
@@ -53,7 +50,7 @@ and data collisions a lot more unlikely.
 
 3. After working with shared memory between servers and command line interaction
 it became apparent that this would not work if multiple Comrelay servers were
-running at the same time. As such the *.comrelay_port* file convention was
+running at the same time. As such the *.comrelay_status* file convention was
 chosen which allows servers to be managed and handled directly from their
 execution directory. Of course this is still done via a request but it is a lot
 less messy than using shared memory and having servers work around each other

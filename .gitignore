@@ -55,5 +55,5 @@ comrelay-*
 comrelay-*.tar.gz
 
 /bin/comrelay
-.comrelay_port
+.comrelay_status
 .comrelay_routes

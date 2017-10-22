@@ -10,15 +10,17 @@ use warnings;
 use LWP::Simple;
 
 # Name of the routes and port file.
-my $routesfile = '.comrelay_routes';
-my $portfile = '.comrelay_port';
+my $routespath = '.comrelay_routes';
+my $statuspath = '.comrelay_status';
 
 # Delimiter for reading of the configuration.
 my $delimiter = ',';
 
+# Formatting guide and header specification.
 my @format = (
     'route', $delimiter,
     'secret', $delimiter,
+    'field', $delimiter,
     'command'
 );
 
@@ -41,7 +43,7 @@ BEGIN {
     our @ISA = qw(Exporter);
 
     # Functions and variables which are exported by default.
-    our @EXPORT = qw(load save add remove);
+    our @EXPORT = qw(load save add remove get);
 
     # Functions and variables which can be optionally exported.
     our @EXPORT_OK = qw();
@@ -49,18 +51,76 @@ BEGIN {
 
 sub _setup {
     # Create the data.csv file for writing.
-    open my $routesfile, '>', $routesfile or die "Routes: Could not open '$routesfile' $!.\n";
+    open my $routeshandle, '>', $routespath or die "Routes: Could not open '$routespath' $!.\n";
 
     # Write the headers.
-    print $routesfile $header;
+    print $routeshandle $header;
 
     # Close handle.
-    close $routesfile;
+    close $routeshandle;
+}
+
+sub save {
+    # Open up the data file.
+    open my $routeshandle, '>', $routespath or die "Routes: Could not open '$routespath' $!.\n";
+
+    # Write the headers.
+    print $routeshandle $header . "\n";
+
+    foreach my $route (keys %routes) {
+        my $secret = $routes{$route}[0];
+        my $field = $routes{$route}[1];
+        my $command = $routes{$route}[2];
+
+        # Create an array for easier string formatting without concatenation.
+        my @formatted = (
+            $route, $delimiter,
+            $secret, $delimiter,
+            $field, $delimiter,
+            $command
+        );
+
+        print $routeshandle join("", @formatted) . "\n";
+    }
+
+    # Close handle.
+    close $routeshandle;
+
+    # Check if the port file exists.
+    my $exists = (-e $statuspath ? 1 : 0);
+
+    if($exists) {
+        # Port of the possibly currently running server.
+        my $port = 0;
+
+        # Read the found port file.
+        local $/ = undef;
+        open my $statushandle, '<', $statuspath or die "Routes: Could not open '$statuspath' $!.\n";
+        $port = <$statushandle>;
+        close $statushandle;
+
+        # Make a reload request if the server is currently running.
+        if($port) {
+            print "Routes: Making an update request to the local server on port $port.\n";
+
+            my $content = LWP::Simple::get("http://localhost:$port/system/update/");
+
+            if($content) {
+                print "Routes: (Response) $content\n";
+            } else {
+                print "Routes: Failed to make a connection to the server. Deleting '$statuspath'.\n";
+
+                unlink $statushandle or print "Routes: Could not delete the file $!.\n";
+            }
+        }
+    }
+
+    %routes;
 }
 
 sub load {
     # Check if the file exists.
-    my $exists = (-e $routesfile ? 1 : 0);
+    my $exists = (-e $routespath ? 1 : 0);
 
     # Check if the file exists. If not run first time setup.
     _setup if(not $exists);
@@ -69,11 +129,12 @@ sub load {
     %routes = ();
 
     # Open the file in read mode.
-    open my $routesfile, '<', $routesfile or die "Routes: Could not open '$routesfile' $!.\n";
+    open my $routeshandle, '<', $routespath or die "Routes: Could not open '$routespath' $!.\n";
 
     # Iterate over lines in the file handle.
     my $linecount = 0;
-    while(my $line = <$routesfile>) {
+    my $formaterror = 0;
+    while(my $line = <$routeshandle>) {
         # Increment line count.
         $linecount++;
 
@@ -84,98 +145,84 @@ sub load {
         next if($line eq $header);
 
         # Split the CSV file with the correct delimiter.
-        my ($route, $command, $secret) = split /$delimiter/, $line;
+        my ($route, $secret, $field, $command) = split /$delimiter/, $line;
 
         # Check file formatting integrity.
-        if(not $route or not $command or not $secret) {
-            print "Routes: Incorrect length of values at line $linecount of '$routesfile'. \n";
+        if(not $route or not $secret or not $field or not $command) {
+            print "Routes: Incorrect length of values at line $linecount of '$routespath'. \n";
+
+            # Print the error line.
+            print "-> $line\n";
+
+            # Increment the formatting error tracking variable.
+            $formaterror++;
 
             next;
         }
 
         if($routes{$route}) {
-            print "Routes: Duplicate route '$route' at line $linecount of '$routesfile'.\n";
+            print "Routes: Duplicate route '$route' at line $linecount of '$routespath'.\n";
+
+            # Print the error line.
+            print "-> $line\n";
+
+            # Increment the formatting error tracking variable.
+            $formaterror++;
 
             next;
         }
 
         # Assign an array to the route hash.
-        $routes{$route} = [$command, $secret];
+        $routes{$route} = [$secret, $field, $command];
     }
 
     # Close the file handle we have previously created.
-    close $routesfile;
+    close $routeshandle;
 
-    %routes;
-}
-
-sub save {
-    # Open up the data file.
-    open my $routesfile, '>', $routesfile or die "Routes: Could not open '$routesfile' $!.\n";
-
-    # Write the headers.
-    print $routesfile "$header\n";
-
-    foreach my $route (keys %routes) {
-        my $secret = $routes{$route}[0];
-        my $command = $routes{$route}[1];
-
-        # Create an array for easier string formatting without concatenation.
-        my @formatted = ($route, $delimiter,  $secret, $delimiter, $command, "\n");
-
-        print $routesfile join("", @formatted);
-    }
-
-    # Close handle.
-    close $routesfile;
-
-    # Check if the port file exists.
-    my $exists = (-e $portfile ? 1 : 0);
-
-    if($exists) {
-        # Port of the possibly currently running server.
-        my $port = 0;
-
-        # Read the found port file.
-        local $/ = undef;
-        open my $portfile, '<', $portfile or die "Routes: Could not open 'port' $!.\n";
-        $port = <$portfile>;
-        close $portfile;
-
-        # Make a reload request if the server is currently running.
-        if($port) {
-            print "Routes: Making an update request to the server on port $port.\n";
-
-            my $content = LWP::Simple::get("http://localhost:$port/admin/update/");
-
-            print "Routes: (Response) $content\n";
-        }
-    }
+    # Attempt to save with the new data to fix formatting issues.
+    print "Routes: Recreating '$routespath' to fix formatting errors.\n" and save if $formaterror;
 
     %routes;
 }
 
 sub add {
     # Get and handle arguments.
-    my ($route, $secret, $command) = @_;
+    my ($route, $secret, $field, $command) = @_;
 
     die 'Missing required arguments' if not $route or not $command;
 
     # Get data if it isn't present.
-    load if(not %routes);
+    load if not %routes;
+
+    my $exists = 0;
+
+    $exists = 1 if $routes{$route};
 
     # Make sure that there isn't already a route defined with this name.
-    die "Routes: The route '$route' already exists.\n" if $routes{$route};
+    print "Routes: The route '$route' already exists. Replacing information.\n" if $exists;
 
-    # Generate a unique ID if no secret is specified.
+    # Set arguments if they are already declared but not passed.
+    $secret = $routes{$route}[0] if $routes{$route} and not $secret;
+    $field = $routes{$route}[1] if $routes{$route} and not $field;
+    $command = $routes{$route}[2] if $routes{$route} and not $command;
+
+    # Generate a unique ID if no secret is specified or available.
     if(not $secret) {
         $secret .= $secretchars[rand @secretchars] for 1..$secretlength;
     }
 
-    # Assign an array to the route hash.
-    $routes{$route} = [$secret, $command];
+    # Set the default access variable if none is set.
+    $field = 'secret' if not $field;
 
-    print "Routes: Successfully added '$route'.\n";
+    # Assign an array to the route hash.
+    $routes{$route} = [$secret, $field, $command];
+
+    if(not $exists){
+        print "Routes: Successfully added '$route'.\n";
+
+    } else {
+        print "Routes: Successfully updated '$route'.\n";
+    }
 
     # Save the changes and return the new data.
     save;

@@ -29,7 +29,7 @@ sub main {
     # Make sure that the variable is set.
     $command ||= 0;
 
-    if($command eq 'server') {
+    if($command eq 'start') {
         # Set defaults.
         my $port = 9669;
         my $bind = '';
@@ -47,7 +47,7 @@ sub main {
         if($ssl_key and $ssl_cert) {
             say "Using $ssl_key and $ssl_cert for SSL.";
             say "Starting a Comrelay HTTP server with SSL on port $port.";
-            
+
         } else {
             say "Starting a Comrelay HTTP server on port $port.";
         }
@@ -59,19 +59,21 @@ sub main {
         # Set defaults.
         my $route = "";
         my $secret = "";
+        my $field = "";
         my $command = "";
 
         # Get command line options.
         GetOptions (
             'route|r=s' => \$route,
             'secret|s=s' => \$secret,
+            'field|f=s' => \$field,
             'command|c=s' => \$command,
         );
 
         die "Required arguments not specified. Use 'help' for reference.\n" if not $route or not $command;
 
         # Set the new route with a command and an optional secret.
-        Comrelay::Routes::add($route, $secret, $command);
+        Comrelay::Routes::add($route, $secret, $field, $command);
 
     } elsif($command eq 'remove') {
         # Set defaults.
@@ -96,10 +98,11 @@ sub main {
         foreach my $route (keys %routes) {
             # Get the data array information.
             my $secret = $routes{$route}[0];
-            my $command = $routes{$route}[1];
+            my $field = $routes{$route}[1];
+            my $command = $routes{$route}[2];
 
             # Print a nicely formatted string for each entry.
-            say "$index. $route (Secret: $secret) \-\> $command";
+            say "$index. Route: $route\n- Secret: $secret\n- Field: $field\n- Command: $command";
 
             $index++; # Increment the index.
         }
@@ -136,61 +139,69 @@ comrelay server [--port|p] [--bind|b] [--key|k --cert|c]
 
 =head1 OPTIONS
 
-=head2 help
+=over 8
+
+=head2 B<help>
 
 Display help and usage.
 
-=head2 list
+=head2 B<list>
 
 Lists routes, their registered command and the given secret.
 
-=head2 add
+=head2 B<add>
 
 Register a new route and a corresponding command.
 
-=head3 ARGUMENTS
+=over 8
 
-=head4 --route|r
+=item B<--route|r>
 
 Specifies the route to relay to the command.
 
-=head4 --command|c
-
-The command to be registered for the route.
-
-=head4 [--secret|s]
+=item B<[--secret|s]>
 
 Optional secret to use. Is randomly generate if not specified.
 
-=head2 remove
+=item B<[--field|f]>
+
+Optional field to use. Is set to 'secret' by default.
+
+=item B<--command|c>
+
+The command to be registered for the route.
+
+=back
+
+=head2 B<remove>
 
 Register a new route and a corresponding command.
 
-=head3 ARGUMENTS
+=over 8
 
-=head4 --route|r
+=item B<--route|r>
 
 Specifies the route to be removed.
 
-=head2 server
+=back
+
+=head2 B<start>
 
 Starts the main HTTP server. For SSL support both a key and a
 certificate must be specified.
 
-=head3 ARGUMENTS
+=over 8
 
-=head4 --port|p
+=item B<--port|p>
 
 The port to run the HTTP server on. Defaults to "9669".
 
-=head4 --bind|b
+=item B<--bind|b>
 
 Address the server should bind to. Defaults to the hostname.
 
-=head4 --key|k
+=item B<[--key|k --cert|c]>
 
-Path of the SSL key to enable SSL.
+Path of the SSL key tand certificate to enable SSL.
 
-=head4 --cert|c
-
-Path of the SSL certificate to enable SSL.
+=back

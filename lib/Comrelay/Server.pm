@@ -14,10 +14,13 @@ use HTTP::Server::Brick;
 use HTTP::Daemon::SSL;
 
 # Name of the routes and port file.
-my $portfilename = '.comrelay_port';
+my $statuspath = '.comrelay_status';
 
 # Main server instance reference.
 my $server;
+
+# Hash storage of routes and their commands.
+my %archiveroutes;
 
 BEGIN {
     require Exporter;
@@ -46,28 +49,88 @@ sub _update {
     # Load route information.
     my %routes = Comrelay::Routes::load;
 
+    # Iterate over archived routes and check if they are still present.
+    foreach my $route (keys %archiveroutes) {
+        # If a route was removed reset the handler.
+        if(not $routes{$route}) {
+            $server->mount("/routes/$route/" => {
+                handler => sub {
+                    my ($req, $res) = @_;
+
+                    $res->header('Content-type', 'text/plain');
+                    $res->code(404);
+
+                    1;
+                },
+                wildcard => 0,
+            });
+
+            _log "Unmounted handler at /routes/$route.";
+        }
+    }
+
     foreach my $route (keys %routes) {
         # Get the data array information.
         my $secret = $routes{$route}[0];
-        my $command = $routes{$route}[1];
+        my $field = $routes{$route}[1];
+        my $command = $routes{$route}[2];
 
         # Mount the new route.
-        $server->mount("/routes/$route/$secret" => {
+        $server->mount("/routes/$route/" => {
             handler => sub {
                 my ($req, $res) = @_;
 
-                _log "Running '$command'.";
-                my $output = `$command`;
+                # Make sure the request is using the POST method and has a payload.
+                if($req->method ne 'POST' or not $req->content) {
+                    $res->code(403);
 
-                # Return the output.
-                $res->header('Content-type', 'text/plain');
-                $res->add_content("Server has run the command '$command' as $ENV{USERNAME}.\n$output");
+                    return 1;
+                }
 
-                1;
+                # Split the content by its delimiter.
+                my @payload = split '&', $req->content;
+
+                # Is incremented if successfully authenticated.
+                my $approved = 0;
+
+                # Iterate over payload entries and check that the access and secret match.
+                for my $entry (@payload) {
+                    my ($payloadfield, $payloadvalue) = split '=', $entry;
+
+                    $approved = 1 if $payloadfield eq $field and $payloadvalue eq $secret;
+                }
+
+                if($approved) {
+                    _log "Approved route '$route' with secret '$secret' via access of '$field'.";
+                    my $output = `$command`;
+
+                    _log "Executed command: '$command'. Command output: '$output'.";
+
+                    # Get the username for logging
+                    my $username = getlogin || getpwuid($<);
+
+                    # Return the output.
+                    $res->header('Content-type', 'text/plain');
+                    $res->add_content("Server has run the command '$command' as $username.\n$output");
+                    $res->code(200);
+
+                    1;
+
+                } else {
+                    my $content = $req->content;
+                    _log "Failed authentication for route '$route'. Payload: '$content'.";
+
+                    $res->code(403);
+
+                    1;
+                }
             },
             wildcard => 0,
         });
     }
+
+    # Store old routes. Required for removal of routes.
+    %archiveroutes = %routes;
 }
 
 sub start {
@@ -82,14 +145,14 @@ sub start {
     $ssl_cert ||= 0; # SSL certificate file path.
 
     # Write a temporary file with the port for other Comrelay processes to use.
-    open my $portfilehandle, '>', $portfilename or die "Server: Could not open '$portfilename' $!.\n";;
-    print $portfilehandle "$port";
-    close $portfilehandle;
+    open my $statushandle, '>', $statuspath or die "Server: Could not open '$statuspath' $!.\n";;
+    print $statushandle "$port";
+    close $statushandle;
 
     # Handle keyboard interrupts and clear memory.
     $SIG{INT} = sub {
-        # Delete the temporary port designation file.
-        unlink $portfilehandle or die "Could not delete the file!\n";
+        # Delete the temporary status port designation file.
+        unlink $statuspath or die "Could not delete the file $!!\n";
 
         exit;
     };
@@ -114,21 +177,22 @@ sub start {
             port => $port
         );
     }
-    # Start mounting inputs.
+
+    # Wildcard catcher for undefined directories.
     $server->mount('/' => {
         handler => sub {
             my ($req, $res) = @_;
 
             $res->header('Content-type', 'text/plain');
-            $res->code(200);
+            $res->code(404);
 
             1;
         },
         wildcard => 1,
     });
 
-    # Start mounting inputs.
-    $server->mount('/admin/update' => {
+    # Start mounting system inputs.
+    $server->mount('/system/update' => {
         handler => sub {
             my ($req, $res) = @_;
 
@@ -137,8 +201,9 @@ sub start {
 
             $res->header('Content-type', 'text/plain');
             $res->add_content("Successfully updated routes.");
+            $res->code(200);
 
-            1;
+            return 1;
         },
         wildcard => 0,
     });
