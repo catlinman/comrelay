@@ -82,7 +82,7 @@ directory, user and permissions and as such always reading and writing in the
 same location. Managing the service and sandboxing is a lot easier this way.
 
 2. Running multiple servers is simpler as servers can be split just by executing
-the application in different directories making server instance configuration
+the application in different directories making server instance management easier
 and data collisions a lot more unlikely.
 
 3. After working with shared memory between servers and command line interaction
@@ -96,9 +96,15 @@ all the time.
 ## Security ##
 
 It is advised to bind the server to localhost as to better handle access to
+<<<<<<< HEAD
 paths such as the *system* route which is used for Comrelay to interact with a
 running server. To do this, another web server such as nginx must proxy pass
 outside connections while restricting access to the *system* routes.
+=======
+paths such as the admin route which is used for Comrelay to interact with a
+running server. To do this, another web server such as nginx must proxy pass
+outside connections while restricting access to the admin routes.
+>>>>>>> e5c6dc9042701fea9d7586d5eb4d0427ba74bbd2
 
 An example template configuration file can be found in the nginx directory of
 this repository.
