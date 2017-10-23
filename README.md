@@ -12,7 +12,7 @@ To install this module, run the following commands:
 	$ make
 	# make install
 
-Once you have installed Comrelay you can use the main command.
+Once you have installed Comrelay you can use the new command.
 
     $ comrelay [help] [list] [add] [remove] [start]
 
@@ -24,6 +24,43 @@ created in the project directory.
 
 For additional information for the given commands please read the help that can
 be viewed with the help command.
+
+## Requests ##
+
+First and foremost: *You must POST not GET*.
+
+Once your server is started and has defined routes you can call these routes.
+The request should be POST *x-www-form-urlencoded* with the payload containing
+a field with the name you specified during route creation and a corresponding
+value of the secret you specified or that which was generated.
+
+GET requests are generally rejected with 404 and 405 errors. If you want these
+to not just show the error message after a request, you can handle them through
+your optional proxy server pass. Otherwise the default messages should suffice
+for the most part.
+
+If your POST request has the wrong credentials or does not contain a payload
+you will receive a 403 error.
+
+In some cases such as GitHub webhooks you might want to avoid the provided
+convention for passing secrets and instead just use a formatted URL to do so.
+More about why this is possible further below.
+
+An example of this can be seen here with a route of *github*, a field of
+*secret* and a secret key of *key*. Make sure your request matches whichever
+HTTP protocol you are using.
+
+    https://domain-name.tld/routes/github?secret=key
+
+Supplying this as the URL works just as well as having a GitHub signed secret.
+However, since this secret is not signed you do not have the option of checking
+its authenticity. One countermeasure to this is to have a command execute
+through this call which will then further inspect the payload and its integrity.
+
+It should be noted here that GitHub webhooks add GET query variables to the
+payload when it makes the POST request. This should explain why the field and
+value of the secret can be appended to the URL. If you are using a different
+system results may vary as Comrelay requires POST requests and their payloads.
 
 ## Configuration ##
 
@@ -38,7 +75,7 @@ guarantees that there will be no errors in the syntax. Still, the user is
 granted the option of modifying and generally managing the configuration file
 with its CSV syntax on their own if they please.
 
-The reasoning for this design decision can be derived from the following.
+The reasoning for this design choice can be derived from the following.
 
 1. The application will be run from a service which specifies an execution
 directory, user and permissions and as such always reading and writing in the
@@ -59,9 +96,9 @@ all the time.
 ## Security ##
 
 It is advised to bind the server to localhost as to better handle access to
-paths such as the admin route which is used for Comrelay to interact with a
-running server. To do, this another web server such as nginx must proxy pass
-outside connections while restricting access to the admin routes.
+paths such as the *system* route which is used for Comrelay to interact with a
+running server. To do this, another web server such as nginx must proxy pass
+outside connections while restricting access to the *system* routes.
 
 An example template configuration file can be found in the nginx directory of
 this repository.
@@ -71,6 +108,11 @@ this should be rather self explanatory as commands that are executed run as
 the given user with their permissions. As such, running Comrelay as root is
 highly discouraged. Make sure you know what you are doing before adding certain
 commands and allowing access to them.
+
+If you want to go overkill you can also put Comrelay behind an extra password
+authentication proxy. Make sure to not proxy the *system* routes in this case
+though, as this will block locally running Comrelay instances from updating
+their server.
 
 ## License ##
 

@@ -81,11 +81,8 @@ sub _update {
                 my ($req, $res) = @_;
 
                 # Make sure the request is using the POST method and has a payload.
-                if($req->method ne 'POST' or not $req->content) {
-                    $res->code(403);
-
-                    return 1;
-                }
+                $res->code(405) and return 1 if $req->method ne 'POST';
+                $res->code(403) and return 1 if not $req->content;
 
                 # Split the content by its delimiter.
                 my @payload = split '&', $req->content;
@@ -183,7 +180,6 @@ sub start {
         handler => sub {
             my ($req, $res) = @_;
 
-            $res->header('Content-type', 'text/plain');
             $res->code(404);
 
             1;
@@ -200,7 +196,7 @@ sub start {
             _update;
 
             $res->header('Content-type', 'text/plain');
-            $res->add_content("Successfully updated routes.");
+            $res->add_content('Successfully updated routes.');
             $res->code(200);
 
             return 1;

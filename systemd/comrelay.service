@@ -1,0 +1,21 @@
+
+[Unit]
+# General service description.
+Description=Comrelay server service
+
+[Service]
+# Service is non forking.
+Type=simple
+
+# Execution on start of service.
+ExecStart=/srv/comrelay/systemd/comrelay.sh
+
+# User to run under.
+User=comrelay
+
+# Set the working directory.
+WorkingDirectory=/srv/comrelay/
+
+[Install]
+# Target file for service management.
+WantedBy=multi-user.target
