@@ -96,15 +96,9 @@ all the time.
 ## Security ##
 
 It is advised to bind the server to localhost as to better handle access to
-<<<<<<< HEAD
 paths such as the *system* route which is used for Comrelay to interact with a
 running server. To do this, another web server such as nginx must proxy pass
 outside connections while restricting access to the *system* routes.
-=======
-paths such as the admin route which is used for Comrelay to interact with a
-running server. To do this, another web server such as nginx must proxy pass
-outside connections while restricting access to the admin routes.
->>>>>>> e5c6dc9042701fea9d7586d5eb4d0427ba74bbd2
 
 An example template configuration file can be found in the nginx directory of
 this repository.
