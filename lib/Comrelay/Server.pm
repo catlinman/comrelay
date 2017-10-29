@@ -22,6 +22,10 @@ my $server;
 # Hash storage of routes and their commands.
 my %archiveroutes;
 
+# Access key for internal Comrelay connections.
+my $access_key = '';
+my @access_chars = ('0'..'9', 'A'..'Z', 'a'..'z');
+
 BEGIN {
     require Exporter;
 
@@ -141,10 +145,17 @@ sub start {
     $ssl_key ||= 0; # SSL key file path.
     $ssl_cert ||= 0; # SSL certificate file path.
 
+    # Generate a new access key.
+    $access_key = '';
+    $access_key .= $access_chars[rand @access_chars] for 1..32;
+
     # Write a temporary file with the port for other Comrelay processes to use.
     open my $statushandle, '>', $statuspath or die "Server: Could not open '$statuspath' $!.\n";;
-    print $statushandle "$port";
+    print $statushandle '+' if $ssl_key and $ssl_cert;
+    print $statushandle "$port:$access_key\n";
     close $statushandle;
+
+    _log "System access key is $access_key";
 
     # Handle keyboard interrupts and clear memory.
     $SIG{INT} = sub {
@@ -192,12 +203,43 @@ sub start {
         handler => sub {
             my ($req, $res) = @_;
 
-            # Reload the routes file and mount new routes.
-            _update;
+            # Make sure the request is using the POST method and has a payload.
+            $res->code(405) and return 1 if $req->method ne 'POST';
+            $res->code(403) and return 1 if not $req->content;
 
-            $res->header('Content-type', 'text/plain');
-            $res->add_content('Successfully updated routes.');
-            $res->code(200);
+            # Split the content by its delimiter.
+            my @payload = split '&', $req->content;
+
+            # Is incremented if successfully authenticated.
+            my $approved = 0;
+
+            # Iterate over payload entries and check that the access and secret match.
+            for my $entry (@payload) {
+                my ($payloadfield, $payloadvalue) = split '=', $entry;
+
+                $approved = 1 if $payloadfield eq 'access' and $payloadvalue eq $access_key;
+            }
+
+            if($approved) {
+                _log "System received update request. Reloading all routes.";
+
+                # Reload the routes file and mount new routes.
+                _update;
+
+                $res->header('Content-type', 'text/plain');
+                $res->add_content('Successfully updated routes.');
+                $res->code(200);
+
+                1;
+
+            } else {
+                my $content = $req->content;
+                _log "System authentication failed. Payload: '$content'.";
+
+                $res->code(403);
+
+                1;
+            }
 
             return 1;
         },

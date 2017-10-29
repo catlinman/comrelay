@@ -24,8 +24,9 @@ WriteMakefile(
         'Test::More' => '0',
     },
     PREREQ_PM => {
+        'HTTP::Daemon::SSL' => '1.04',
         'HTTP::Server::Brick' => '0.1.7',
-        'LWP::Simple' => '6.27',
+        'LWP' => '6.27',
     },
     dist  => { COMPRESS => 'gzip -9f', SUFFIX => 'gz', },
     clean => { FILES => 'comrelay-*' },

@@ -5,9 +5,10 @@ package Comrelay::Routes;
 # Basic Perl configuration.
 use strict;
 use warnings;
+use Data::Dumper;
 
-# HTTP request handling for updating the server via GET request.
-use LWP::Simple;
+# HTTP request handling for updating the server via POST request.
+use LWP::UserAgent ();
 
 # Name of the routes and port file.
 my $routespath = '.comrelay_routes';
@@ -27,7 +28,7 @@ my @format = (
 my $header = join("", @format);
 
 # Secret random generation characters.
-my @secretchars = ("A".."Z", "a".."z");
+my @secretchars = ('0'..'9', 'A'..'Z', 'a'..'z');
 my $secretlength = 32;
 
 # Hash storage of routes and their commands.
@@ -86,27 +87,57 @@ sub save {
     # Close handle.
     close $routeshandle;
 
-    # Check if the port file exists.
+    # Check if the status file exists.
     my $exists = (-e $statuspath ? 1 : 0);
 
     if($exists) {
-        # Port of the possibly currently running server.
+        # Get status information about the currently running server.
+        my $ssl = 0;
         my $port = 0;
+        my $access = 0;
+
+        # Variable storing the status information.
+        my $status = 0;
 
         # Read the found port file.
         local $/ = undef;
         open my $statushandle, '<', $statuspath or die "Routes: Could not open '$statuspath' $!.\n";
-        $port = <$statushandle>;
+        $status = <$statushandle>;
         close $statushandle;
 
         # Make a reload request if the server is currently running.
-        if($port) {
-            print "Routes: Making an update request to the local server on port $port.\n";
+        if($status) {
+            # Remove newlines.
+            $status =~ s/\R//g;
 
-            my $content = LWP::Simple::get("http://localhost:$port/system/update/");
+            # Handle SSL.
+            if(substr($status, 0, 1) eq '+') {
+                $ssl = 1;
+                ($port, $access) = split(':', substr($status, 1));
 
-            if($content) {
-                print "Routes: (Response) $content\n";
+            } else {
+                ($port, $access) = split ':', $status;
+            }
+
+            # Create a new UserAgent.
+            my $agent = LWP::UserAgent->new();
+            $agent->timeout(5);
+
+            # Set the payload fields and content.
+            my %content = ('access' => $access);
+
+            # Set the URL for access. Change protocol if SSL is enabled.
+            my $url = "http://localhost:$port/system/update/";
+            $url = "https://localhost:$port/system/update/" if($ssl);
+
+            print "Routes: Making an update POST request to the local server at '$url'.\n";
+
+            # Make a POST request as required by all requests.
+            my $response = $agent->post("http://localhost:$port/system/update/", \%content)->decoded_content;
+
+            if($response) {
+                print "Routes: (Response) $response\n";
+
             } else {
                 print "Routes: Failed to make a connection to the server. Deleting '$statuspath'.\n";
 
