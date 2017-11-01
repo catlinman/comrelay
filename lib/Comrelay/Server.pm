@@ -73,6 +73,7 @@ sub _update {
         }
     }
 
+    # Iterate over routes in the routes hash.
     foreach my $route (keys %routes) {
         # Get the data array information.
         my $secret = $routes{$route}[0];
@@ -90,6 +91,7 @@ sub _update {
 
                 # Split the content by its delimiter.
                 my @payload = split '&', $req->content;
+                my $content = $req->content;
 
                 # Is incremented if successfully authenticated.
                 my $approved = 0;
@@ -103,8 +105,14 @@ sub _update {
 
                 if($approved) {
                     _log "Approved route '$route' with secret '$secret' via access of '$field'.";
-                    my $output = `$command`;
 
+                    # Escape any single quotes in the content.
+                    my $escaped = $content =~ s/\'//gr;
+
+                    # Run an echo beforehand and pipe its output into the following command.
+                    my $output = `echo '$escaped' | $command`;
+
+                    # Log information. Ignore payload printing since the user should know it anyway.
                     _log "Executed command: '$command'. Command output: '$output'.";
 
                     # Get the username for logging
@@ -118,7 +126,6 @@ sub _update {
                     1;
 
                 } else {
-                    my $content = $req->content;
                     _log "Failed authentication for route '$route'. Payload: '$content'.";
 
                     $res->code(403);
